@@ -23,16 +23,10 @@ provider:
     GROUPS_TABLE: Groups-${self:provider.stage} # replce the later by stage name
     IMAGES_TABLE: Images-${self:provider.stage}
     IMAGES_INDEX: ImageIdIndex
-    # CONNECTION_TABLE: Connection-${self:provider.stage}
+    CONNECTION_TABLE: Connections-${self:provider.stage}
     IMAGES_S3_BUCKET: serverless-images-udagram-${self:provider.stage}
     # SIGNED_URL_EXPIRATION: 300
   iamRoleStatements:
-    # - Effect: Allow
-    #   Action:
-    #     - dynamodb:Scan
-    #     - dynamodb:PutItem
-    #     - dynamodb:DeleteItem
-    #   Resource: arn:aws:dynamodb:${self:opt, self:provider.region}:*:table/${self:provider.environment.CONNECTION_TABLE}
     - Effect: Allow
       Action:
         - dynamodb:Scan
@@ -53,6 +47,12 @@ provider:
         - s3:GetObject
         - s3:PutObject
       Resource: arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET}/*
+    - Effect: Allow
+      Action:
+        - dynamodb:Scan
+        - dynamodb:PutItem
+        - dynamodb:DeleteItem
+      Resource: arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.CONNECTION_TABLE}
 
 functions:
   GetGroups: #name of function independent
@@ -98,6 +98,17 @@ functions:
           #     application/json: ${file(models/create-image-request.json)}
   SendUploadNotifications: #add handler without event
     handler: src/lambda/s3/sendNotifications.handler
+  
+  ConnectionHandler:
+    handler: src/lambda/websocket/connect.handler
+    events:
+      - websocket:
+          route: $connect
+  DisconnectionHandler:
+    handler: src/lambda/websocket/disconnect.handler
+    events:
+      - websocket:
+          route: $disconnect
 resources:
   Resources:
     ImagesDynamoDBTable:
@@ -136,7 +147,17 @@ resources:
           - AttributeName: id
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
-    
+    WebSocketDynamoTable:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        TableName: ${self:provider.environment.CONNECTION_TABLE}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
     AttachmentsBucket: #cors headers
       Type: AWS::S3::Bucket
       Properties:
