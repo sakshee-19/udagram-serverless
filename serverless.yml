@@ -23,9 +23,16 @@ provider:
     GROUPS_TABLE: Groups-${self:provider.stage} # replce the later by stage name
     IMAGES_TABLE: Images-${self:provider.stage}
     IMAGES_INDEX: ImageIdIndex
+    # CONNECTION_TABLE: Connection-${self:provider.stage}
     IMAGES_S3_BUCKET: serverless-images-udagram-${self:provider.stage}
     # SIGNED_URL_EXPIRATION: 300
   iamRoleStatements:
+    # - Effect: Allow
+    #   Action:
+    #     - dynamodb:Scan
+    #     - dynamodb:PutItem
+    #     - dynamodb:DeleteItem
+    #   Resource: arn:aws:dynamodb:${self:opt, self:provider.region}:*:table/${self:provider.environment.CONNECTION_TABLE}
     - Effect: Allow
       Action:
         - dynamodb:Scan
@@ -89,6 +96,8 @@ functions:
           # request:
           #   schema:
           #     application/json: ${file(models/create-image-request.json)}
+  SendUploadNotifications: #add handler without event
+    handler: src/lambda/s3/sendNotifications.handler
 resources:
   Resources:
     ImagesDynamoDBTable:
@@ -132,6 +141,10 @@ resources:
       Type: AWS::S3::Bucket
       Properties:
         BucketName: ${self:provider.environment.IMAGES_S3_BUCKET}
+        NotificationConfiguration: #config to connect event from this bucket to lambda func
+          LambdaConfigurations:
+          - Event: s3:ObjectCreated:* # type of event allowed upload
+            Function: !GetAtt SendUploadNotificationsLambdaFunction.Arn # it will append LambdaFunction to our function and we need its ARN here
         CorsConfiguration:
           CorsRules:
             -
@@ -146,7 +159,15 @@ resources:
                 - 'DELETE'
                 - 'HEAD'
               MaxAge: 3000
-    
+    # add permisiion to allow s3 to invoke lambda func
+    SendUploadNotificationsPermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !Ref SendUploadNotificationsLambdaFunction #func to invoke 
+        Principal: s3.amazonaws.com
+        Action: lambda:InvokeFunction
+        SourceAccount: !Ref AWS::AccountId
+        SourceArn: arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET}
     BucketPolicy: # IAM policies
       Type: AWS::S3::BucketPolicy
       Properties:
