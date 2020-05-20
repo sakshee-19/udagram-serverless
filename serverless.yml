@@ -97,7 +97,12 @@ functions:
           #   schema:
           #     application/json: ${file(models/create-image-request.json)}
   SendUploadNotifications: #add handler without event
+    environment:
+      STAGE: ${self:provider.stage}
+      API_ID:
+        Ref: WebsocketsApi
     handler: src/lambda/s3/sendNotifications.handler
+
   
   ConnectionHandler:
     handler: src/lambda/websocket/connect.handler
