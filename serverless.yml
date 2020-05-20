@@ -30,6 +30,11 @@ provider:
   
   environment:
     GROUPS_TABLE: Groups-${self:provider.stage} # replce the later by stage name
+    IMAGES_TABLE: Images-${self:provider.stage}
+    IMAGES_INDEX: ImageIdIndex
+    CONNECTION_TABLE: Connections-${self:provider.stage}
+    IMAGES_S3_BUCKET: serverless-images-udagram-${self:provider.stage}
+    # SIGNED_URL_EXPIRATION: 300
   iamRoleStatements:
     - Effect: Allow
       Action:
@@ -37,6 +42,26 @@ provider:
         - dynamodb:PutItem
         - dynamodb:GetItem
       Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.GROUPS_TABLE}
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:PutItem
+      Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.IMAGES_TABLE}
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+      Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.IMAGES_TABLE}/index/${self:provider.environment.IMAGES_INDEX}
+    - Effect: Allow
+      Action:
+        - s3:GetObject
+        - s3:PutObject
+      Resource: arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET}/*
+    - Effect: Allow
+      Action:
+        - dynamodb:Scan
+        - dynamodb:PutItem
+        - dynamodb:DeleteItem
+      Resource: arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.CONNECTION_TABLE}
 
 functions:
   GetGroups: #name of function independent
@@ -53,15 +78,78 @@ functions:
           method: post
           path: groups
           cors: true # enable cors
-          reqvalidatorName: RequestBodyValidator
-          documentation: 
-            summary: Create a new group
-            description: Create a new group
-            requestModels:
-              'application/json': GroupRequest
+          request:
+            schema:
+              application/json: ${file(models/create-group-request.json)}
+  GetImages:
+    handler: src/lambda/http/getImages.handler
+    events:
+      - http:
+          method: get
+          path: groups/{groupId}/images
+          cors: true
+  GetImage:
+    handler: src/lambda/http/getImage.handler
+    events:
+      - http:
+          method: get
+          path: images/{imageId}
+          cors: true
+  CreateImage:
+    handler: src/lambda/http/createImage.handler
+    events:
+      - http:
+          method: post
+          path: groups/{groupId}/images
+          cors: true
+          # request:
+          #   schema:
+          #     application/json: ${file(models/create-image-request.json)}
+  SendUploadNotifications: #add handler without event
+    environment:
+      STAGE: ${self:provider.stage}
+      API_ID:
+        Ref: WebsocketsApi
+    handler: src/lambda/s3/sendNotifications.handler
 
+  
+  ConnectionHandler:
+    handler: src/lambda/websocket/connect.handler
+    events:
+      - websocket:
+          route: $connect
+  DisconnectionHandler:
+    handler: src/lambda/websocket/disconnect.handler
+    events:
+      - websocket:
+          route: $disconnect
 resources:
   Resources:
+    ImagesDynamoDBTable:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        TableName: ${self:provider.environment.IMAGES_TABLE}
+        AttributeDefinitions:
+          - AttributeName: groupId
+            AttributeType: S
+          - AttributeName: timestamp
+            AttributeType: S
+          - AttributeName: imageId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: groupId
+            KeyType: HASH
+          - AttributeName: timestamp
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: ${self:provider.environment.IMAGES_INDEX}
+            KeySchema:
+            - AttributeName: imageId
+              KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
+        
     GroupsDynamoDBTable:
       Type: "AWS::DynamoDB::Table"
       Properties:
@@ -73,14 +161,59 @@ resources:
           - AttributeName: id
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
-    RequestBodyValidator:
-      Type: AWS::ApiGateway::RequestValidator
+    WebSocketDynamoTable:
+      Type: "AWS::DynamoDB::Table"
       Properties:
-        Name: 'request-body-validator'
-        RestApiId:
-          Ref: ApiGatewayRestApi
-        ValidateRequestBody: true
-        ValidateRequestParameters: false
-
-package:
-  excludeDevDependencies: false
+        TableName: ${self:provider.environment.CONNECTION_TABLE}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+    AttachmentsBucket: #cors headers
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:provider.environment.IMAGES_S3_BUCKET}
+        NotificationConfiguration: #config to connect event from this bucket to lambda func
+          LambdaConfigurations:
+          - Event: s3:ObjectCreated:* # type of event allowed upload
+            Function: !GetAtt SendUploadNotificationsLambdaFunction.Arn # it will append LambdaFunction to our function and we need its ARN here
+        CorsConfiguration:
+          CorsRules:
+            -
+              AllowedOrigins:
+                - '*'
+              AllowedHeaders:
+                - '*'
+              AllowedMethods:
+                - 'GET'
+                - 'POST'
+                - 'PUT'
+                - 'DELETE'
+                - 'HEAD'
+              MaxAge: 3000
+    # add permisiion to allow s3 to invoke lambda func
+    SendUploadNotificationsPermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !Ref SendUploadNotificationsLambdaFunction #func to invoke 
+        Principal: s3.amazonaws.com
+        Action: lambda:InvokeFunction
+        SourceAccount: !Ref AWS::AccountId
+        SourceArn: arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET}
+    BucketPolicy: # IAM policies
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        PolicyDocument:
+          Id: MyPolicy # to read all images without any auth and identification
+          Version: "2012-10-17"
+          Statement:
+            - Sid: PublicReadForGetBucketObjects
+              Effect: Allow
+              Principal: '*'
+              Action: 's3:GetObject'
+              Resource: 'arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET}/*'
+        Bucket: !Ref AttachmentsBucket
+              

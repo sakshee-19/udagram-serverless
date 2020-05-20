@@ -13,4 +13,3 @@
     "required": ["name", "description"],
     "additionalProperties": false    
   }
-  
