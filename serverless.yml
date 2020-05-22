@@ -117,7 +117,7 @@ functions:
               - - arn:aws:sns
                 - Ref: AWS::Region
                 - Ref: AWS::AccountId
-                - ${self:custom:topicName}
+                - ${self:custom.topicName}
           topicName: ${self:custom.topicName}
   ConnectionHandler:
     handler: src/lambda/websocket/connect.handler
@@ -196,10 +196,6 @@ resources:
       Properties:
         BucketName: ${self:provider.environment.IMAGES_S3_BUCKET}
         NotificationConfiguration: #config to connect event from this bucket to lambda func
-          # LambdaConfigurations:
-          # - Event: s3:ObjectCreated:* # type of event allowed upload
-            # Function: !GetAtt SendUploadNotificationsLambdaFunction.Arn # it will append LambdaFunction to our function and we need its ARN here
-            # change from lambda config to sns topic config
           TopicConfigurations:
             - Event: s3:ObjectCreated:Put
               Topic: !Ref ImagesTopic
