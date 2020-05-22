@@ -1,10 +1,10 @@
 import {APIGatewayProxyHandler, APIGatewayProxyResult, APIGatewayProxyEvent} from 'aws-lambda';
-import 'source-map-support/register'
+// import 'source-map-support/register'
 import * as AWS  from 'aws-sdk'
 
-const docClient = new AWS.DynamoDB.DocumentClient();
+const docClient = new AWS.DynamoDB.DocumentClient()
 
-const table = process.env.GROUPS_TABLE;
+const table = process.env.GROUPS_TABLE
 
 export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEvent ): Promise<APIGatewayProxyResult> => {
     console.log("processing event ", event);
@@ -13,7 +13,7 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
         TableName: table
     }).promise();
 
-    const items = results.Items;
+    const items = results.Items
 
     return {
         statusCode: 200,
