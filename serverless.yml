@@ -214,4 +214,28 @@ resources:
               Action: 's3:GetObject'
               Resource: 'arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET}/*'
         Bucket: !Ref AttachmentsBucket
-              
+    ImagesSearch: # resource to creaate elastic cluster
+      Type: AWS::Elasticsearch::Domain
+      Properties:
+        ElasticsearchVersion: '6.3'
+        DomainName: image-seacrh-${self:provider.stage}
+        ElasticsearchClusterConfig: #machine config
+          DedicatedMasterEnabled: false #no master host
+          InstanceCount: '1' # one machine one instance
+          ZoneAwarenessEnabled: false
+          InstanceType: t2.small.elasticsearch # tyoe of machine
+        EBSOptions: #elastic block store this section define storage available for cluster node 
+          EBSEnabled: true
+          Iops: 0
+          VolumeSize: 10
+          VolumeType: 'gp2'
+        AccessPolicies:
+          Version: '2012-10-17'
+          Statement:
+            -
+              Effect: Allow
+              Principal:
+                AWS: '*'
+              Action: 'es:*' 
+              Resource: '*'
+
