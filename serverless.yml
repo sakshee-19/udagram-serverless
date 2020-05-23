@@ -63,6 +63,9 @@ custom:
     
 
 functions:
+  Auth:
+    handler: src/lambda/auth/authOAuthorizer.handler
+
   GetGroups: #name of function independent
     handler: src/lambda/http/getGroups.handler
     events:
@@ -77,6 +80,7 @@ functions:
           method: post
           path: groups
           cors: true # enable cors
+          authorizer: Auth
           request:
             schema:
               application/json: ${file(models/create-group-request.json)}
@@ -101,6 +105,7 @@ functions:
           method: post
           path: groups/{groupId}/images
           cors: true
+          authorizer: Auth
           # request:
           #   schema:
           #     application/json: ${file(models/create-image-request.json)}
@@ -162,6 +167,17 @@ functions:
 
 resources:
   Resources:
+    #  it will set correct cors headers in case custom authorizer fails
+    GateResponseDefault4XX:
+      Type: 'AWS::ApiGateway::GatewayResponse'
+      Properties:
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*''"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization'"
+          gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+        ResponseType: DEFAULT_4XX
+        RestApiId:
+          Ref: 'ApiGatewayRestApi'
     GroupsDynamoDBTable:
       Type: "AWS::DynamoDB::Table"
       Properties:

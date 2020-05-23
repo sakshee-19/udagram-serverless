@@ -9,7 +9,9 @@ const imagesBucketName = process.env.IMAGES_S3_BUCKET
 const thumbnailBucketName = process.env.THUMBNAILS_S3_BUCKET
 
 export const handler: SNSHandler = async (event: SNSEvent) => {
-  console.log('Processing SNS event ', JSON.stringify(event))
+    console.log("SNS Handler image resizing")
+
+    console.log('Processing SNS event ', JSON.stringify(event))
   for (const snsRecord of event.Records) {
     const s3EventStr = snsRecord.Sns.Message
     console.log('Processing S3 event', s3EventStr)
