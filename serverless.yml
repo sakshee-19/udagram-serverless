@@ -4,15 +4,10 @@ service:
 #app: your-app-name
 #org: your-org-name
 
-custom:
-  topicName: imagesTopic-${self:provider.stage} #name for the topic 
-  webpack:
-    webpackConfig: ./webpack.config.js
-    includeModules: true
 
 # Add the serverless-webpack plugin
-plugins:
-  - serverless-webpack
+# plugins:
+#   - serverless-webpack
 
 provider:
   name: aws
@@ -25,8 +20,8 @@ provider:
     IMAGES_TABLE: Images-${self:provider.stage}
     IMAGES_INDEX: ImageIdIndex
     CONNECTION_TABLE: Connections-${self:provider.stage}
-    IMAGES_S3_BUCKET: serverless-images-udagram-${self:provider.stage}
-    THUMBNAILS_S3_BUCKET: serverless-udagram-thumbnail-saks-${self:provider.stage}
+    IMAGES_S3_BUCKET: serverless-images-udagram-sak-${self:provider.stage}
+    THUMBNAILS_S3_BUCKET: serverless-udagram-thumbnail-sak-${self:provider.stage}
     # SIGNED_URL_EXPIRATION: 300
   iamRoleStatements:
     - Effect: Allow
@@ -51,14 +46,21 @@ provider:
       Resource: arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET}/*
     - Effect: Allow
       Action:
+        - s3:PutObject
+      Resource: "arn:aws:s3:::${self:provider.environment.THUMBNAILS_S3_BUCKET}/*"
+    - Effect: Allow
+      Action:
         - dynamodb:Scan
         - dynamodb:PutItem
         - dynamodb:DeleteItem
       Resource: arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.CONNECTION_TABLE}
-    - Effect: Allow
-      Action:
-        - s3:PutObject
-      Resource: "arn:aws:s3:::${self:provider.environment.THUMBNAILS_S3_BUCKET}/*"
+
+custom:
+  topicName: imagesTopic-${self:provider.stage} #name for the topic 
+  webpack:
+    webpackConfig: ./webpack.config.js
+    includeModules: true
+    
 
 functions:
   GetGroups: #name of function independent
@@ -124,24 +126,26 @@ functions:
                 - Ref: AWS::AccountId
                 - ${self:custom.topicName}
           topicName: ${self:custom.topicName}
+
   ConnectionHandler:
     handler: src/lambda/websocket/connect.handler
     events:
       - websocket:
           route: $connect
+
   DisconnectionHandler:
     handler: src/lambda/websocket/disconnect.handler
     events:
       - websocket:
           route: $disconnect
-  SyncWithElasticsearch:
-    handler: src/lambda/dynamoDb/elasticSearchSync.handler
-    environment:
-      ES_ENDPOINT: !GetAtt ImagesSearch.DomainEndpoint
-    events: # specify the event for which we need to invoke this func that is dynamodb stream and speicfy its table stream arn
-      - stream:
-          type: dynamodb
-          arn: !GetAtt ImagesDynamoDBTable.StreamArn   # like imagedynamodb resources and get attr from it
+  # SyncWithElasticsearch:
+  #   handler: src/lambda/dynamoDb/elasticSearchSync.handler
+  #   environment:
+  #     ES_ENDPOINT: !GetAtt ImagesSearch.DomainEndpoint
+  #   events: # specify the event for which we need to invoke this func that is dynamodb stream and speicfy its table stream arn
+  #     - stream:
+  #         type: dynamodb
+  #         arn: !GetAtt ImagesDynamoDBTable.StreamArn   # like imagedynamodb resources and get attr from it
   ResizeImage:
     handler: src/lambda/s3/resizeImage.handler
     events:
@@ -158,6 +162,18 @@ functions:
 
 resources:
   Resources:
+    GroupsDynamoDBTable:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        TableName: ${self:provider.environment.GROUPS_TABLE}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+    
     ImagesDynamoDBTable:
       Type: "AWS::DynamoDB::Table"
       Properties:
@@ -182,22 +198,10 @@ resources:
             Projection:
               ProjectionType: ALL
         BillingMode: PAY_PER_REQUEST
-        StreamSpecification:
-          StreamViewType: NEW_IMAGE # contains after image only
+        # StreamSpecification:
+        #   StreamViewType: NEW_IMAGE # contains after image only
 
-    GroupsDynamoDBTable:
-      Type: "AWS::DynamoDB::Table"
-      Properties:
-        TableName: ${self:provider.environment.GROUPS_TABLE}
-        AttributeDefinitions:
-          - AttributeName: id
-            AttributeType: S
-        KeySchema:
-          - AttributeName: id
-            KeyType: HASH
-        BillingMode: PAY_PER_REQUEST
-    
-    WebSocketDynamoTable:
+    WebSocketConnectionsDynamoDBTable:
       Type: "AWS::DynamoDB::Table"
       Properties:
         TableName: ${self:provider.environment.CONNECTION_TABLE}
@@ -221,6 +225,8 @@ resources:
     #     SourceAccount: !Ref AWS::AccountId
     #     SourceArn: arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET}
     
+    
+    # resource to add topic
     AttachmentsBucket:
       Type: AWS::S3::Bucket
       DependsOn: SNSTopicPolicy
@@ -244,7 +250,6 @@ resources:
                 - DELETE
                 - HEAD
               MaxAge: 3000
-    
     BucketPolicy: # IAM policies
       Type: AWS::S3::BucketPolicy
       Properties:
@@ -274,42 +279,45 @@ resources:
                 !Ref ImagesTopic # on this topic
               Condition:
                 ArnLike:
-                  AWS:Source:Arn: arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET} # from this bucket
+                  AWS:SourceArn: arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET} # from this bucket
         Topics: 
           - !Ref ImagesTopic
-
+    
     ThumbnailsBucket:
       Type: AWS::S3::Bucket
       Properties:
         BucketName: ${self:provider.environment.THUMBNAILS_S3_BUCKET}
-
-    ImagesTopic: # resource to add topic
+    
+    ImagesTopic:
       Type: AWS::SNS::Topic
       Properties:
-        DisplayName: Image_bucket_topic
+        DisplayName: Image bucket topic
         TopicName: ${self:custom.topicName}
+    
   
-    ImagesSearch: # resource to creaate elastic cluster
-      Type: AWS::Elasticsearch::Domain
-      Properties:
-        ElasticsearchVersion: '6.3'
-        DomainName: image-seacrh-${self:provider.stage}
-        ElasticsearchClusterConfig: #machine config
-          DedicatedMasterEnabled: false #no master host
-          InstanceCount: '1' # one machine one instance
-          ZoneAwarenessEnabled: false
-          InstanceType: t2.small.elasticsearch # tyoe of machine
-        EBSOptions: #elastic block store this section define storage available for cluster node 
-          EBSEnabled: true
-          Iops: 0
-          VolumeSize: 10
-          VolumeType: 'gp2'
-        AccessPolicies:
-          Version: '2012-10-17'
-          Statement:
-            -
-              Effect: Allow
-              Principal:
-                AWS: '*'
-              Action: 'es:*' 
-              Resource: '*'
+    # ImagesSearch: # resource to creaate elastic cluster
+    #   Type: AWS::Elasticsearch::Domain
+    #   Properties:
+    #     ElasticsearchVersion: '6.3'
+    #     DomainName: image-seacrh-${self:provider.stage}
+    #     ElasticsearchClusterConfig: #machine config
+    #       DedicatedMasterEnabled: false #no master host
+    #       InstanceCount: '1' # one machine one instance
+    #       ZoneAwarenessEnabled: false
+    #       InstanceType: t2.small.elasticsearch # tyoe of machine
+    #     EBSOptions: #elastic block store this section define storage available for cluster node 
+    #       EBSEnabled: true
+    #       Iops: 0
+    #       VolumeSize: 10
+    #       VolumeType: 'gp2'
+    #     AccessPolicies:
+    #       Version: '2012-10-17'
+    #       Statement:
+    #         -
+    #           Effect: Allow
+    #           Principal:
+    #             AWS: '*'
+    #           Action: 'es:*' 
+    #           Resource: '*'
+
+
