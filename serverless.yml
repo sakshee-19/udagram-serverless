@@ -6,8 +6,8 @@ service:
 
 
 # Add the serverless-webpack plugin
-# plugins:
-#   - serverless-webpack
+plugins:
+  - serverless-webpack
 
 provider:
   name: aws
@@ -227,12 +227,12 @@ resources:
     
     
     # resource to add topic
-    AttachmentsBucket:
+    AttachmentsBucket: #cors headers
       Type: AWS::S3::Bucket
       DependsOn: SNSTopicPolicy
       Properties:
         BucketName: ${self:provider.environment.IMAGES_S3_BUCKET}
-        NotificationConfiguration:
+        NotificationConfiguration: #config to connect event from this bucket to lambda func
           TopicConfigurations:
             - Event: s3:ObjectCreated:Put
               Topic: !Ref ImagesTopic
@@ -244,11 +244,11 @@ resources:
               AllowedHeaders:
                 - '*'
               AllowedMethods:
-                - GET
-                - PUT
-                - POST
-                - DELETE
-                - HEAD
+                - 'GET'
+                - 'POST'
+                - 'PUT'
+                - 'DELETE'
+                - 'HEAD'
               MaxAge: 3000
     BucketPolicy: # IAM policies
       Type: AWS::S3::BucketPolicy
@@ -288,7 +288,7 @@ resources:
       Properties:
         BucketName: ${self:provider.environment.THUMBNAILS_S3_BUCKET}
     
-    ImagesTopic:
+    ImagesTopic: # resource to add topic
       Type: AWS::SNS::Topic
       Properties:
         DisplayName: Image bucket topic
