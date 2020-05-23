@@ -196,6 +196,7 @@ resources:
           - AttributeName: id
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
+    
     WebSocketDynamoTable:
       Type: "AWS::DynamoDB::Table"
       Properties:
@@ -207,6 +208,18 @@ resources:
           - AttributeName: id
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
+    
+    
+
+    # add permisiion to allow s3 to invoke lambda func
+    # SendUploadNotificationsPermission:
+    #   Type: AWS::Lambda::Permission
+    #   Properties:
+    #     FunctionName: !Ref SendUploadNotificationsLambdaFunction #func to invoke 
+    #     Principal: s3.amazonaws.com
+    #     Action: lambda:InvokeFunction
+    #     SourceAccount: !Ref AWS::AccountId
+    #     SourceArn: arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET}
     
     AttachmentsBucket:
       Type: AWS::S3::Bucket
@@ -231,20 +244,7 @@ resources:
                 - DELETE
                 - HEAD
               MaxAge: 3000
-    ThumbnailsBucket:
-      Type: AWS::S3::Bucket
-      Properties:
-        BucketName: ${self:provider.environment.THUMBNAILS_S3_BUCKET}
-
-    # add permisiion to allow s3 to invoke lambda func
-    SendUploadNotificationsPermission:
-      Type: AWS::Lambda::Permission
-      Properties:
-        FunctionName: !Ref SendUploadNotificationsLambdaFunction #func to invoke 
-        Principal: s3.amazonaws.com
-        Action: lambda:InvokeFunction
-        SourceAccount: !Ref AWS::AccountId
-        SourceArn: arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET}
+    
     BucketPolicy: # IAM policies
       Type: AWS::S3::BucketPolicy
       Properties:
@@ -258,6 +258,7 @@ resources:
               Action: 's3:GetObject'
               Resource: 'arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET}/*'
         Bucket: !Ref AttachmentsBucket
+    
     SNSTopicPolicy:
       # to allow s3 to send events to this topic
       Type: AWS::SNS::TopicPolicy
@@ -276,12 +277,18 @@ resources:
                   AWS:Source:Arn: arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET} # from this bucket
         Topics: 
           - !Ref ImagesTopic
+
+    ThumbnailsBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:provider.environment.THUMBNAILS_S3_BUCKET}
+
     ImagesTopic: # resource to add topic
       Type: AWS::SNS::Topic
       Properties:
-        DisplayName: Image bucket topic
+        DisplayName: Image_bucket_topic
         TopicName: ${self:custom.topicName}
-
+  
     ImagesSearch: # resource to creaate elastic cluster
       Type: AWS::Elasticsearch::Domain
       Properties:
