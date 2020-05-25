@@ -23,6 +23,9 @@ provider:
     IMAGES_S3_BUCKET: serverless-images-udagram-sak-${self:provider.stage}
     THUMBNAILS_S3_BUCKET: serverless-udagram-thumbnail-sak-${self:provider.stage}
     # SIGNED_URL_EXPIRATION: 300
+    AUTH_0_SECRET_ID: Auth0Secret-${self:provider.stage} # name ot auth secret 
+    AUTH_0_SECRET_FIELD: auth0Secret # name of aws resource that contains secret
+  
   iamRoleStatements:
     - Effect: Allow
       Action:
@@ -54,6 +57,14 @@ provider:
         - dynamodb:PutItem
         - dynamodb:DeleteItem
       Resource: arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.CONNECTION_TABLE}
+    - Effect: Allow
+      Action:
+        - secretsmanager:GetSecretValue
+      Resource: !Ref Auth0Secret # to read secret value
+    - Effect: Allow
+      Action:
+        - kms:Decrypt
+      Resource: !GetAtt KMSKey.Arn # decrypt value
 
 custom:
   topicName: imagesTopic-${self:provider.stage} #name for the topic 
@@ -336,4 +347,39 @@ resources:
     #           Action: 'es:*' 
     #           Resource: '*'
 
+    # gives root user full access to kms key    
+    KMSKey:
+      Type: AWS::KMS::Key
+      Properties:
+        Description: KMS key to encrypt Auth0 secret
+        KeyPolicy:
+          Version: '2012-10-17'
+          Id: key-default-1
+          Statement:
+            - Sid: Allow administration of the key
+              Effect: Allow
+              Principal:
+                AWS:
+                  Fn::Join:
+                  - ':'
+                  - - 'arn:aws:iam:'
+                    - Ref: AWS::AccountId
+                    - 'root'
+              Action:
+                - 'kms:*'
+              Resource: '*'
+  
+    # basically name for ksm key
+    KMSKeyAlias:
+      Type: AWS::KMS::Alias
+      Properties:
+        AliasName: alias/auth0Key-${self:provider.stage}
+        TargetKeyId: !Ref KMSKey 
 
+    # this is where auth secret will be stored
+    Auth0Secret:
+      Type: AWS::SecretsManager::Secret
+      Properties:
+        Name: ${self:provider.environment.AUTH_0_SECRET_ID}
+        Description: Auth0 secret
+        KmsKeyId: !Ref KMSKey
