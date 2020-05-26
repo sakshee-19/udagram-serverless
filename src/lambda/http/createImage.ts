@@ -1,7 +1,8 @@
 import {APIGatewayProxyResult, APIGatewayProxyEvent, APIGatewayProxyHandler} from 'aws-lambda'
 import * as AWS from 'aws-sdk';
 import * as uuid from 'uuid';
-
+import * as middy from 'middy';
+import { cors } from 'middy/middlewares'
 const imageTable = process.env.IMAGES_TABLE
 const groupTable = process.env.GROUPS_TABLE
 // const expirationTime = process.env.SIGNED_URL_EXPIRATION
@@ -13,7 +14,7 @@ const s3 = new AWS.S3({
     signatureVersion: 'v4'
 })
 
-export const handler:APIGatewayProxyHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+export const handler = middy(async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     console.log("processing event ",event);
 
     const groupId = event.pathParameters.groupId
@@ -56,15 +57,12 @@ export const handler:APIGatewayProxyHandler = async (event: APIGatewayProxyEvent
 
     return {
         statusCode: 201,
-        headers: {
-            'Access-Control-Allow-Origin': '*'
-        },
         body: JSON.stringify({
             newItem: newItem,
             uploadUrl: url
         })
     }  
-}
+})
 
 async function groupExists(groupId){
     const result = await docClient.get({
@@ -83,3 +81,9 @@ function getSignedUrl(imageId) {
         Expires: 300
     })
 }
+
+handler.use(
+    cors ({
+        credentials: true
+    })
+)
