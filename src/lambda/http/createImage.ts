@@ -1,4 +1,4 @@
-import {APIGatewayProxyResult, APIGatewayProxyEvent, APIGatewayProxyHandler} from 'aws-lambda'
+import {APIGatewayProxyResult, APIGatewayProxyEvent} from 'aws-lambda'
 import * as AWS from 'aws-sdk';
 import * as uuid from 'uuid';
 import * as middy from 'middy';
@@ -22,9 +22,6 @@ export const handler = middy(async (event: APIGatewayProxyEvent): Promise<APIGat
     if(!groupItem) {
         return {
             statusCode: 404,
-            headers: {
-                "Access-Cotrol-Allow_origin":"*"
-            },
             body: JSON.stringify({
                 message: "group does not exists"
             })
