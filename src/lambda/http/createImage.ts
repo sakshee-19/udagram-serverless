@@ -22,7 +22,8 @@ export const handler:APIGatewayProxyHandler = async (event: APIGatewayProxyEvent
         return {
             statusCode: 404,
             headers: {
-                "Access-Cotrol-Allow_origin":"*"
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Credentials': true
             },
             body: JSON.stringify({
                 message: "group does not exists"

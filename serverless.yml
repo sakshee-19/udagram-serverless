@@ -74,6 +74,8 @@ custom:
     
 
 functions:
+  RSA256:
+    handler: src/lambda/auth/rs256Auth0Authorizer.handler
   Auth:
     handler: src/lambda/auth/authOAuthorizer.handler
 
@@ -91,7 +93,8 @@ functions:
           method: post
           path: groups
           cors: true # enable cors
-          authorizer: Auth
+          credentials: true
+          authorizer: RSA256
           request:
             schema:
               application/json: ${file(models/create-group-request.json)}
@@ -116,7 +119,8 @@ functions:
           method: post
           path: groups/{groupId}/images
           cors: true
-          authorizer: Auth
+          credentials: true
+          authorizer: RSA256
           # request:
           #   schema:
           #     application/json: ${file(models/create-image-request.json)}
