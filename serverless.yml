@@ -15,12 +15,22 @@ custom:
       - name: GroupRequest
         contentType: application/json
         schema: ${file(models/create-group-request.json)}  # read from a file in models folder with given name of file 
-
+  serverless-offline:
+    port: 3003
+  dynamodb:
+    start:
+      port: 8000
+      inMemory: true
+      migrate: true # create data according to the resource provided in yaml
+    stages: # Add this section of the config
+      - dev
 # Add the serverless-webpack plugin
 plugins:
   - serverless-webpack
   - serverless-aws-documentation
   - serverless-reqvalidator-plugin
+  - serverless-dynamodb-local
+  - serverless-offline
 
 provider:
   name: aws
@@ -32,7 +42,7 @@ provider:
     GROUPS_TABLE: Groups-${self:provider.stage} # replce the later by stage name
     IMAGES_TABLE: Images-${self:provider.stage}
     IMAGES_INDEX: ImageIdIndex
-    CONNECTION_TABLE: Connections-${self:provider.stage}
+    CONNECTION_TABLE: Connection-${self:provider.stage}
     IMAGES_S3_BUCKET: serverless-images-udagram-${self:provider.stage}
     # SIGNED_URL_EXPIRATION: 300
   iamRoleStatements:
