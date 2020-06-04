@@ -38,6 +38,9 @@ plugins:
   - serverless-plugin-canary-deployments
 
 provider:
+  tracing:
+    lambda: true
+    apiGateway: true
   name: aws
   runtime: nodejs10.x
   stage: ${opt:stage, 'dev'} # either provided by user or default dev
