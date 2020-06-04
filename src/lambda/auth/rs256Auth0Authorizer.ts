@@ -43,10 +43,9 @@ return
 
 }
 
-async function verfiyToken(token: string): Promise<JwtToken> {
+ function verfiyToken(token: string): JwtToken {
     var cert = readFileSync('public.pem');  // get public key
-    const res = await verify(token, cert, { algorithms: ['RS256'] }) as JwtToken
-    return res
+    return verify(token, cert, { algorithms: ['RS256'] }) as JwtToken
 }
 
 function getToken( event:CustomAuthorizerEvent) {
@@ -54,8 +53,6 @@ function getToken( event:CustomAuthorizerEvent) {
     if(!authorization.startsWith('Bearer'))
         throw new Error("auth token is not valid")
     const splits = authorization.split(" ")
-    if(splits.length != 2)
-        throw new Error("auth token is not valid")
     const token = splits[1]
     return token
 }
