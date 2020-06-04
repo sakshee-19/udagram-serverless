@@ -91,7 +91,7 @@ functions:
           method: post
           path: groups
           cors: true # enable cors
-          authorizer: Auth
+          # authorizer: Auth
           request:
             schema:
               application/json: ${file(models/create-group-request.json)}
@@ -116,7 +116,7 @@ functions:
           method: post
           path: groups/{groupId}/images
           cors: true
-          authorizer: Auth
+          # authorizer: Auth
           # request:
           #   schema:
           #     application/json: ${file(models/create-image-request.json)}
