@@ -3,7 +3,7 @@ import 'source-map-support/register'
 import * as AWS  from 'aws-sdk'
 import * as uuid from 'uuid';
 
-const docClient = new AWS.DynamoDB.DocumentClient();
+const docClient = createDocClient();
 
 const table = process.env.GROUPS_TABLE;
 
@@ -32,4 +32,15 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
             item
         })
     }
+}
+
+function createDocClient() {
+    if(process.env.IS_OFFLINE) {
+        console.log("creating a local dynamoDB instance")
+        return new AWS.DynamoDB.DocumentClient({
+            region: 'localhost',
+            endpoint: 'http://localhost:8000'
+        })
+    }
+    return new AWS.DynamoDB.DocumentClient()
 }
