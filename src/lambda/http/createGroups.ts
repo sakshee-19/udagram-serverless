@@ -13,7 +13,8 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
 
     const item = {
         id: id,
-        ...JSON.parse(event.body)
+        ...JSON.parse(event.body),
+        timestamp: new Date().toISOString()
     }
 
     await docClient.put({

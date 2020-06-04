@@ -35,6 +35,7 @@ plugins:
   - serverless-reqvalidator-plugin
   - serverless-dynamodb-local
   - serverless-offline
+  - serverless-plugin-canary-deployments
 
 provider:
   name: aws
@@ -92,7 +93,10 @@ provider:
       Action:
         - kms:Decrypt
       Resource: !GetAtt KMSKey.Arn # decrypt value    
-
+    - Effect: Allow
+      Action:
+        - codedeploy:*
+      Resource: '*' # decrypt value    
 functions:
   Auth:
     handler: src/lambda/auth/authOAuthorizer.handler
@@ -115,6 +119,9 @@ functions:
           request:
             schema:
               application/json: ${file(models/create-group-request.json)}
+    deploymentSettings:
+      type: Linear10PercentEvery1Minute
+      alias: Live
   GetImages:
     handler: src/lambda/http/getImages.handler
     events:
