@@ -5,6 +5,10 @@ service:
 #org: your-org-name
 
 custom:
+  topicName: imagesTopic-${self:provider.stage} #name for the topic 
+  webpack:
+    webpackConfig: ./webpack.config.js
+    includeModules: true
   documentation:
     api:
       info:
@@ -87,14 +91,7 @@ provider:
     - Effect: Allow
       Action:
         - kms:Decrypt
-      Resource: !GetAtt KMSKey.Arn # decrypt value
-
-custom:
-  topicName: imagesTopic-${self:provider.stage} #name for the topic 
-  webpack:
-    webpackConfig: ./webpack.config.js
-    includeModules: true
-    
+      Resource: !GetAtt KMSKey.Arn # decrypt value    
 
 functions:
   Auth:
