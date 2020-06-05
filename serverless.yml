@@ -3,7 +3,9 @@ service:
 # app and org for use with dashboard.serverless.com
 #app: your-app-name
 #org: your-org-name
-
+package:
+  individually: true
+  
 custom:
   topicName: imagesTopic-${self:provider.stage} #name for the topic 
   webpack:
